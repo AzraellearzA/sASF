@@ -3315,9 +3315,11 @@ public sealed class Bot : IAsyncDisposable, IDisposable {
 			);
 		}
 
+/* 阻止加入ASF组
 		if (BotConfig.RemoteCommunication.HasFlag(BotConfig.ERemoteCommunication.SteamGroup)) {
 			Utilities.InBackground(() => ArchiWebHandler.JoinGroup(SharedInfo.ASFGroupSteamID));
 		}
+*/
 
 		if (CardsFarmer.Paused) {
 			// Emit initial game playing status in this case
