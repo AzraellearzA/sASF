@@ -127,7 +127,7 @@ public sealed class BotDatabase : GenericDatabase {
 	[JsonInclude]
 	internal ConcurrentHashSet<ulong> TradingBlacklistSteamIDs { get; private init; } = [];
 
-	[JsonInclude]
+	//[JsonInclude] 不储存AccessToken
 	private string? BackingAccessToken { get; set; }
 
 	[JsonInclude]
