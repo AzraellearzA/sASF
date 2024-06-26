@@ -60,7 +60,7 @@ public sealed class BotDatabase : GenericDatabase {
 			}
 
 			BackingAccessToken = value;
-			Utilities.InBackground(Save);
+			//Utilities.InBackground(Save); 不储存AccessToken
 		}
 	}
 
