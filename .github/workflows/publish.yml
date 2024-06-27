@@ -335,7 +335,7 @@ jobs:
         artifacts: "out/*"
         bodyFile: .github/RELEASE_TEMPLATE.md
         makeLatest: false
-        name: ArchiSteamFarm V${{ github.ref_name }}
+        name: sASF V${{ github.ref_name }}
         prerelease: true
         token: ${{ secrets.GITHUB_TOKEN }}
         updateOnlyUnreleased: true
