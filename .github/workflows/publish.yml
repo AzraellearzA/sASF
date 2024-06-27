@@ -8,8 +8,6 @@ env:
   DOTNET_NOLOGO: true
   DOTNET_SDK_VERSION: 8.0
   NODE_JS_VERSION: 'lts/*'
-  PLUGINS_BUNDLED: ArchiSteamFarm.OfficialPlugins.ItemsMatcher ArchiSteamFarm.OfficialPlugins.MobileAuthenticator ArchiSteamFarm.OfficialPlugins.SteamTokenDumper
-  PLUGINS_INCLUDED: ArchiSteamFarm.OfficialPlugins.Monitoring # Apart from declaring them here, there is certain amount of hardcoding needed below for uploading
 
 permissions: {}
 
@@ -59,17 +57,7 @@ jobs:
         - os: ubuntu-latest
           variant: generic
         - os: ubuntu-latest
-          variant: linux-arm
-        - os: ubuntu-latest
-          variant: linux-arm64
-        - os: ubuntu-latest
           variant: linux-x64
-        - os: macos-latest
-          variant: osx-arm64
-        - os: macos-latest
-          variant: osx-x64
-        - os: windows-latest
-          variant: win-arm64
         - os: windows-latest
           variant: win-x64
 
@@ -101,7 +89,7 @@ jobs:
         path: ASF-ui/dist
 
     - name: Prepare private key for signing on Unix
-      if: startsWith(matrix.os, 'macos-') || startsWith(matrix.os, 'ubuntu-')
+      if: startsWith(matrix.os, 'ubuntu-')
       env:
         ASF_PRIVATE_SNK: ${{ secrets.ASF_PRIVATE_SNK }}
       shell: sh
@@ -132,35 +120,8 @@ jobs:
             }
         }
 
-    - name: Prepare ArchiSteamFarm.OfficialPlugins.SteamTokenDumper on Unix
-      if: startsWith(matrix.os, 'macos-') || startsWith(matrix.os, 'ubuntu-')
-      env:
-        STEAM_TOKEN_DUMPER_TOKEN: ${{ secrets.STEAM_TOKEN_DUMPER_TOKEN }}
-      shell: sh
-      run: |
-        set -eu
-
-        if [ -n "${STEAM_TOKEN_DUMPER_TOKEN-}" ] && [ -f "ArchiSteamFarm.OfficialPlugins.SteamTokenDumper/SharedInfo.cs" ]; then
-            sed "s/STEAM_TOKEN_DUMPER_TOKEN/${STEAM_TOKEN_DUMPER_TOKEN}/g" "ArchiSteamFarm.OfficialPlugins.SteamTokenDumper/SharedInfo.cs" > "ArchiSteamFarm.OfficialPlugins.SteamTokenDumper/SharedInfo.cs.new"
-            mv "ArchiSteamFarm.OfficialPlugins.SteamTokenDumper/SharedInfo.cs.new" "ArchiSteamFarm.OfficialPlugins.SteamTokenDumper/SharedInfo.cs"
-        fi
-
-    - name: Prepare ArchiSteamFarm.OfficialPlugins.SteamTokenDumper on Windows
-      if: startsWith(matrix.os, 'windows-')
-      env:
-        STEAM_TOKEN_DUMPER_TOKEN: ${{ secrets.STEAM_TOKEN_DUMPER_TOKEN }}
-      shell: pwsh
-      run: |
-        Set-StrictMode -Version Latest
-        $ErrorActionPreference = 'Stop'
-        $ProgressPreference = 'SilentlyContinue'
-
-        if ((Test-Path env:STEAM_TOKEN_DUMPER_TOKEN) -and ($env:STEAM_TOKEN_DUMPER_TOKEN) -and (Test-Path "ArchiSteamFarm.OfficialPlugins.SteamTokenDumper\SharedInfo.cs" -PathType Leaf)) {
-            (Get-Content "ArchiSteamFarm.OfficialPlugins.SteamTokenDumper\SharedInfo.cs").Replace('STEAM_TOKEN_DUMPER_TOKEN', "$env:STEAM_TOKEN_DUMPER_TOKEN") | Set-Content "ArchiSteamFarm.OfficialPlugins.SteamTokenDumper\SharedInfo.cs"
-        }
-
     - name: Publish ASF-${{ matrix.variant }} on Unix
-      if: startsWith(matrix.os, 'macos-') || startsWith(matrix.os, 'ubuntu-')
+      if: startsWith(matrix.os, 'ubuntu-')
       env:
         VARIANT: ${{ matrix.variant }}
       shell: bash
@@ -228,50 +189,8 @@ jobs:
             }
         }
 
-    - name: Publish bundled plugins on Unix
-      if: startsWith(matrix.os, 'macos-') || startsWith(matrix.os, 'ubuntu-')
-      env:
-        VARIANT: ${{ matrix.variant }}
-      shell: bash
-      run: |
-        set -euo pipefail
-
-        if [ "$VARIANT" = 'generic' ]; then
-            variantArgs="-p:TargetLatestRuntimePatch=false -p:UseAppHost=false"
-        else
-            variantArgs="-r $VARIANT"
-        fi
-
-        for plugin in $PLUGINS_BUNDLED; do
-            dotnet publish "$plugin" -c "$CONFIGURATION" -o "out/${VARIANT}/plugins/${plugin}" "-p:ASFVariant=${VARIANT}" -p:ContinuousIntegrationBuild=true --nologo $variantArgs
-        done
-
-    - name: Publish bundled plugins on Windows
-      if: startsWith(matrix.os, 'windows-')
-      env:
-        VARIANT: ${{ matrix.variant }}
-      shell: pwsh
-      run: |
-        Set-StrictMode -Version Latest
-        $ErrorActionPreference = 'Stop'
-        $ProgressPreference = 'SilentlyContinue'
-
-        if ($env:VARIANT -like 'generic*') {
-            $variantArgs = '-p:TargetLatestRuntimePatch=false', '-p:UseAppHost=false'
-        } else {
-            $variantArgs = '-r', "$env:VARIANT"
-        }
-
-        foreach ($plugin in $env:PLUGINS_BUNDLED.Split([char[]] $null, [System.StringSplitOptions]::RemoveEmptyEntries)) {
-            dotnet publish "$plugin" -c "$env:CONFIGURATION" -o "out\$env:VARIANT\plugins\$plugin" "-p:ASFVariant=$env:VARIANT" -p:ContinuousIntegrationBuild=true --nologo $variantArgs
-
-            if ($LastExitCode -ne 0) {
-                throw "Last command failed."
-            }
-        }
-
     - name: Zip ASF-${{ matrix.variant }} on Unix
-      if: startsWith(matrix.os, 'macos-') || startsWith(matrix.os, 'ubuntu-')
+      if: startsWith(matrix.os, 'ubuntu-')
       env:
         VARIANT: ${{ matrix.variant }}
       shell: bash
@@ -373,54 +292,6 @@ jobs:
         name: ${{ matrix.os }}_ASF-${{ matrix.variant }}
         path: out/ASF-${{ matrix.variant }}.zip
 
-    - name: Publish included plugins on Unix
-      if: ${{ matrix.os == 'ubuntu-latest' && matrix.variant == 'generic' }}
-      env:
-        VARIANT: ${{ matrix.variant }}
-      shell: bash
-      run: |
-        set -euo pipefail
-
-        # By default use fastest compression
-        seven_zip_args="-mx=1"
-        zip_args="-1"
-
-        # Tweak compression args for release publishing
-        case "$GITHUB_REF" in
-            "refs/tags/"*)
-                seven_zip_args="-mx=9 -mfb=258 -mpass=15"
-                zip_args="-9"
-                ;;
-        esac
-
-        for plugin in $PLUGINS_INCLUDED; do
-            dotnet publish "$plugin" -c "$CONFIGURATION" -o "out/${plugin}" "-p:ASFVariant=${VARIANT}" -p:ContinuousIntegrationBuild=true -p:TargetLatestRuntimePatch=false -p:UseAppHost=false --nologo
-
-            # Create the final zip file
-            if command -v 7z >/dev/null; then
-                7z a -bd -slp -tzip -mm=Deflate $seven_zip_args "out/${plugin}.zip" "${GITHUB_WORKSPACE}/out/${plugin}/*"
-            else
-                (
-                    cd "${GITHUB_WORKSPACE}/out/${plugin}"
-                    zip -q -r $zip_args "../${plugin}.zip" .
-                )
-            fi
-        done
-
-    - name: Generate artifact attestation for ArchiSteamFarm.OfficialPlugins.Monitoring
-      if: ${{ github.event_name == 'push' && matrix.os == 'ubuntu-latest' && matrix.variant == 'generic' }}
-      uses: actions/attest-build-provenance@v1.3.2
-      with:
-        subject-path: out/ArchiSteamFarm.OfficialPlugins.Monitoring.zip
-
-    - name: Upload ArchiSteamFarm.OfficialPlugins.Monitoring
-      if: ${{ matrix.os == 'ubuntu-latest' && matrix.variant == 'generic' }}
-      uses: actions/upload-artifact@v4.3.3
-      with:
-        if-no-files-found: error
-        name: ArchiSteamFarm.OfficialPlugins.Monitoring
-        path: out/ArchiSteamFarm.OfficialPlugins.Monitoring.zip
-
   release:
     if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') }}
     needs: publish-asf
@@ -444,52 +315,16 @@ jobs:
         name: ubuntu-latest_ASF-generic
         path: out
 
-    - name: Download ASF-linux-arm artifact from ubuntu-latest
-      uses: actions/download-artifact@v4.1.7
-      with:
-        name: ubuntu-latest_ASF-linux-arm
-        path: out
-
-    - name: Download ASF-linux-arm64 artifact from ubuntu-latest
-      uses: actions/download-artifact@v4.1.7
-      with:
-        name: ubuntu-latest_ASF-linux-arm64
-        path: out
-
     - name: Download ASF-linux-x64 artifact from ubuntu-latest
       uses: actions/download-artifact@v4.1.7
       with:
         name: ubuntu-latest_ASF-linux-x64
         path: out
 
-    - name: Download ASF-osx-arm64 artifact from macos-latest
-      uses: actions/download-artifact@v4.1.7
-      with:
-        name: macos-latest_ASF-osx-arm64
-        path: out
-
-    - name: Download ASF-osx-x64 artifact from macos-latest
-      uses: actions/download-artifact@v4.1.7
-      with:
-        name: macos-latest_ASF-osx-x64
-        path: out
-
-    - name: Download ASF-win-arm64 artifact from windows-latest
-      uses: actions/download-artifact@v4.1.7
-      with:
-        name: windows-latest_ASF-win-arm64
-        path: out
-
     - name: Download ASF-win-x64 artifact from windows-latest
       uses: actions/download-artifact@v4.1.7
       with:
         name: windows-latest_ASF-win-x64
-        path: out
-
-    - name: Download ArchiSteamFarm.OfficialPlugins.Monitoring artifact
-      uses: actions/download-artifact@v4.1.7
-      with:
-        name: ArchiSteamFarm.OfficialPlugins.Monitoring
         path: out
 
     - name: Import GPG key for signing
