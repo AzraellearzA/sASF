@@ -45,7 +45,7 @@ using SteamKit2.Internal;
 namespace ArchiSteamFarm.Steam.Interaction;
 
 public sealed class Commands {
-	private const int SteamTypingStatusDelay = 60 * 60 * 1000; // Steam client broadcasts typing status each 60 mins
+	private const ushort SteamTypingStatusDelay = 10 * 1000; // Steam client broadcasts typing status each 10 seconds
 
 	private readonly Bot Bot;
 	private readonly Dictionary<uint, string> CachedGamesOwned = new();
